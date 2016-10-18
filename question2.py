@@ -1,7 +1,8 @@
+import sys
 import math
 import numpy as np
 import random
-
+import os
 
 def read_datafile(fname, attribute_data_type = 'integer'):
    inf = open(fname,'r')
@@ -40,11 +41,8 @@ class DecisionTree :
 	
    def train(self, X_train, Y_train, attributes) :
       # receives a list of objects of type Example
-      # TODO: implement decision tree training
-      # Set label to the plurality value
-      self.label = pluralityValue(Y_train)
+      self.label = pluralityValue(Y_train) # Set label to the plurality value
       self.attributes = attributes
-      print self.curr_depth
       # Check i X_train is empty
       if len(X_train) is 0:
          # When we are searching in testing, if we get back none, should do plurality value
@@ -64,18 +62,13 @@ class DecisionTree :
          # We don't need to remove the attributes already used
          # Using an attribute already used will result in 0 information gain
          if self.split_random == 0:
-            print "curr_depth = " + str(self.curr_depth)
             self.A = argMax(set(self.attributes),X_train,Y_train)
          else:
             self.A = random.sample(self.attributes,1)[0]
          self.attributes.remove(self.A)
-         print "A = " + str(self.A)
          for v_k in range(2):
             X_exs = [e for e in X_train if e[self.A] == v_k]
             Y_exs = [Y_train[i] for i in range(len(Y_train)) if X_train[i][self.A] == v_k]
-            print "v_k = " + str(v_k)
-            print "X_exs = " + str(X_exs)
-            print "Y_exs = " + str(Y_exs)
             subtree = DecisionTree(self.split_random,self.depth_limit,self.curr_depth+1,v_k)
             self.branch.append(subtree.train(X_exs,Y_exs,set(self.attributes)))
          return self
@@ -83,7 +76,6 @@ class DecisionTree :
          
    def predict(self, X_train):
       # receives a list of booleans
-      # TODO: implement decision tree prediction
       if self.leaf is not None:
          return self.leaf
       elif self.branch[X_train[self.A]] is not None:
@@ -100,8 +92,6 @@ def entropy(y):
    entropy = 0.0
    if y.count(0) is not 0 and y.count(1) is not 0:
       for i in range(2) : entropy += -(y.count(i)/float(len(y)))*math.log((y.count(i)/float(len(y))),2)
-   else:
-      print "split = " + str(y)
    return entropy
 
 #===
@@ -116,23 +106,17 @@ def s_v(x,y,v,a):
 def argMax(attributes,x,y):
    maxIndex = {-1}
    max = 0
-   print "entropy(y) = " + str(entropy(y))
-   #for a in range(attributes):
    for a in attributes:
-      print "a = " + str(a)
       infoGain = entropy(y) - np.sum([float(len(s_v(x,y,v,a))) / float(len(y)) * entropy(s_v(x,y,v,a)) for v in range(2)])
       if infoGain > max:
          maxIndex = {a}
          max = infoGain
       elif infoGain == max:
          maxIndex.add(a)
-   # If all were zero then set to a random value
-   index = random.sample(maxIndex,1)[0]
-   if index == -1:
-      index = random.sample(attributes,1)[0]
-   print "attribute = " + str(index)
-   print "max = " + str(max)
-   return index
+   indexOut = random.sample(maxIndex,1)[0] # If more than one max, set to random
+   if indexOut == -1:
+      indexOut = random.sample(attributes,1)[0]
+   return indexOut
 
 #===
 # Returns the most common output value among a set of examples
@@ -153,30 +137,33 @@ def compute_accuracy(dt_classifier, X_test, Y_test):
       y = Y_test[i]
       if y == dt_classifier.predict(x) :
          numRight += 1
-   print numRight
    return (numRight*1.0)/len(Y_test)
 
 #==============================================
 #==============================================
-X_train = [[0,0,0,0,0],[0,1,0,1,1],[1,1,1,1,1],[1,0,0,0,0],[1,1,0,1,1],[0,1,1,1,1],[0,0,1,1,0],[0,1,0,0,1],[0,0,1,1,1],[0,0,0,0,1]]
-Y_train = [0,0,0,1,1,0,1,0,1,1]
 
+# Read command line arguments
+train_file = sys.argv[1]
+tree_type = sys.argv[2]
+depth = int(sys.argv[3])
+test_file = sys.argv[4]
+output_file = sys.argv[5]
 
-#X_train, Y_train = read_datafile('train.txt')
-#X_test, Y_test = read_datafile('test.txt')
-# TODO: write your code
+# Read train and test file
+X_train, Y_train = read_datafile(train_file)
+X_test, Y_test = read_datafile(test_file)
 
-# Global variable my_attributes used by dt.train
-my_attributes = {i for i in range(len(X_train[0]))}
+# Create and train a decision tree
+my_attributes = {i for i in range(len(X_train[0]))}   # Set of attributes
+splitFlag = 0 if tree_type == 'I' else 1  # INFO GAIN = 0, RANDOM = 1
+dt = DecisionTree(splitFlag,depth,0,1)
+dt.train(X_train,Y_train,set(my_attributes))
 
-depthLimit = 3
-splitFlag = 0
-dt = DecisionTree(splitFlag,depthLimit,0,1)
-#dt.train(x,y)
-dt.train(X_train,Y_train,my_attributes)
-#print dt.predict([1,0,0])
-print dt.predict([1,1,1,1,1])
-#print compute_accuracy(dt,X_test,Y_test)
+print "compute_accuracy = " + str(compute_accuracy(dt,X_test,Y_test))
 
-
-
+# Print to output file
+if not os.path.exists(output_file):
+   file(output_file, 'w').close()
+f = open(output_file,'a+')
+f.write(str(compute_accuracy(dt,X_test,Y_test)) + "\n")
+f.close()
